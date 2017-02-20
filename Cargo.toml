@@ -1,0 +1,9 @@
+[package]
+name = "hw2"
+version = "0.1.0"
+authors = ["cbreeden <github@u.breeden.cc>"]
+
+[dependencies]
+rand="*"
+lazy_static="*"
+itertools="*"
