@@ -5,6 +5,7 @@ use rand::distributions::{IndependentSample, Range};
 
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
 extern crate itertools;
 
 use itertools::Itertools;
@@ -188,33 +189,53 @@ mod exercise1 {
 
         println!("Variance1: {}", var1);
         println!("Variance2: {}", var2);
+
+        stratta(n);
     }
 
     fn stratta(n: usize) {
-        let indices = (1..4).combinations(6);
-        let part = n / 3usize.pow(6);
+        let n = 3usize.pow(6)*200;
+        let m = [0.0, 1.0/3.0, 2.0/3.0];
+        let indices = iproduct!(m.iter(), m.iter(), m.iter(), m.iter(), m.iter(), m.iter());
+        let j = n / 3usize.pow(6);
 
-        let space = Range::new(0f64, 0.333333f64);
+        let space = Range::new(0f64, 1f64);
         let mut rng = rand::thread_rng();
 
-        let mut sumstr = 0;
-        let mut sumsqr = 0;
+        let mut sum = 0f64;
+        let mut var = 0f64;
 
-        for _ in n {
-            for idx in indices {
+        for (s1, s2, s3, s4, s5, s6) in indices {
+            let mut sqr = 0f64;
+            let mut sum_tmp = 0f64;
+            for _ in 0..j {
+                // generate new variables given strata indices
+                let t1 = space.ind_sample(&mut rng) / 3.0 + s1;
+                let t2 = 2.0 * space.ind_sample(&mut rng) / 3.0 + 2.0 * s2;
+                let t3 = space.ind_sample(&mut rng) / 3.0 + s3;
+                let t4 = space.ind_sample(&mut rng) / 3.0 + s4;
+                let t5 = space.ind_sample(&mut rng) / 3.0 + s5;
+                let t6 = space.ind_sample(&mut rng) / 3.0 + s6;
 
+                let x = (t1 + t4)
+                    .min(t1 + t3 + t5 + t6)
+                    .min(t2 + t5 + t6)
+                    .min(t2 + t3 + t4);
+
+                sum_tmp += x;
+                sqr += x * x;
             }
 
-            let t1 = space.ind_sample(&mut rng);
-            let t2 = 2. * space.ind_sample(&mut rng);
-            let t3 = space.ind_sample(&mut rng);
-            let t4 = space.ind_sample(&mut rng);
-            let t5 = space.ind_sample(&mut rng);
-            let t6 = space.ind_sample(&mut rng);
-
-
+            sum += sum_tmp;
+            var += (sqr - sum_tmp.powi(2) / (j as f64) ) / ((j - 1) as f64);
         }
+
+        sum = sum * 1.0 / (3usize.pow(6) as f64) * 1.0 / (j as f64);
+        println!("Strat estimator: {}", sum);
+        println!("Strat Variance: {}", var);
     }
+
+
 }
 
 
