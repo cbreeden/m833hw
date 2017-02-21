@@ -1,12 +1,15 @@
 #![allow(unused_imports, unused_mut, dead_code, unused_variables, non_snake_case)]
 extern crate rand;
 use rand::Rng;
+use rand::StdRng;
 use rand::distributions::{IndependentSample, Range};
 
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate itertools;
+extern crate statrs;
+use statrs::distribution::{Exponential, Distribution};
 
 use itertools::Itertools;
 
@@ -134,7 +137,6 @@ mod exercise1 {
         println!("Estimate: {}", mc);
         println!("Variance: {}", var);
 
-
         println!("");
         println!("## Using control variate ##");
 
@@ -155,11 +157,11 @@ mod exercise1 {
         println!("Estimator with 1: {}", est_1);
 
         let var_1 = xs.iter().zip(ys.iter())
-            .map(|(x,y)| (x - (y - 1.0) - est_1)*(x - (y - 1.0) - est_1) )
+            .map(|(x,y)| (x - (y - 1.0) - est_1)*(x - (y - 1.0) - est_1))
             .sum::<f64>() / (n as f64 - 1.0);
 
         let var_a = xs.iter().zip(ys.iter())
-            .map(|(x,y)| (x - alpha*(y - 1.0) - est_a)*(x - alpha*(y - 1.0) - est_a) )
+            .map(|(x,y)| (x - alpha*(y - 1.0) - est_a)*(x - alpha*(y - 1.0) - est_a))
             .sum::<f64>() / (n as f64 - 1.0);
 
         println!("Variance with 1: {}", var_1);
@@ -193,8 +195,8 @@ mod exercise1 {
         stratta(n);
     }
 
-    fn stratta(n: usize) {
-        let n = 3usize.pow(6)*200;
+    fn stratta(n: usize) -> f64 {
+        let n = 3usize.pow(6)*137;
         let m = [0.0, 1.0/3.0, 2.0/3.0];
         let indices = iproduct!(m.iter(), m.iter(), m.iter(), m.iter(), m.iter(), m.iter());
         let j = n / 3usize.pow(6);
@@ -205,9 +207,9 @@ mod exercise1 {
         let mut sum = 0f64;
         let mut var = 0f64;
 
+        let mut samples = Vec::<f64>::with_capacity(n);
+
         for (s1, s2, s3, s4, s5, s6) in indices {
-            let mut sqr = 0f64;
-            let mut sum_tmp = 0f64;
             for _ in 0..j {
                 // generate new variables given strata indices
                 let t1 = space.ind_sample(&mut rng) / 3.0 + s1;
@@ -222,23 +224,123 @@ mod exercise1 {
                     .min(t2 + t5 + t6)
                     .min(t2 + t3 + t4);
 
-                sum_tmp += x;
-                sqr += x * x;
+                samples.push(x);
             }
-
-            sum += sum_tmp;
-            var += (sqr - sum_tmp.powi(2) / (j as f64) ) / ((j - 1) as f64);
         }
 
-        sum = sum * 1.0 / (3usize.pow(6) as f64) * 1.0 / (j as f64);
-        println!("Strat estimator: {}", sum);
-        println!("Strat Variance: {}", var);
+        let estimate = samples.iter().sum::<f64>() / n as f64;
+        let variance = samples.iter()
+            .map(|&x| (x - estimate).powi(2))
+            .sum::<f64>() / (n as f64 - 1.0);
+
+        // println!("Strat estimator: {}", estimate);
+        // println!("Strat Variance: {}", variance);
+        estimate
     }
 
+    pub fn test() {
+        const n: usize = 1_000;
+        let mut samples = Vec::with_capacity(n);
+        for _ in 0..n {
+            samples.push(stratta(0));
+        }
 
+        let estimate = samples.iter().sum::<f64>() / n as f64;
+        let variance = samples.iter()
+            .map(|&x| (x - estimate).powi(2))
+            .sum::<f64>() / (n as f64 - 1.0);
+
+        println!("Estimate: {}", estimate);
+        println!("Variance: {}", variance);
+    }
+
+    pub fn test2() {
+        let n = 1_000;
+        let (xs, ys) = generate_xy(n);
+
+        let mut samples = Vec::with_capacity(n);
+        for _ in 0..n {
+            let (xs, _) = generate_xy(100_000);
+            let mc = xs.iter()
+                .fold(0.0, |acc, &x| acc + x) / (100_000 as f64);
+            samples.push(mc);
+        }
+
+        let estimate = samples.iter().sum::<f64>() / n as f64;
+        let variance = samples.iter()
+            .map(|&x| (x - estimate).powi(2))
+            .sum::<f64>() / (n as f64 - 1.0);
+
+        println!("Estimate: {}", estimate);
+        println!("Variance: {}", variance);
+    }
 }
 
+mod exercise2 {
+    use super::*;
+    const N: usize = 100_000;
+
+    pub fn mc() -> f64 {
+        let mut r = rand::StdRng::new().unwrap();
+
+        let e20 = Exponential::new(20.0).unwrap();
+        let others = (2usize..11)
+            .map(|x| Exponential::new(x as f64).unwrap())
+            .collect::<Vec<_>>();
+
+        let mut samples = Vec::with_capacity(N);
+        for _ in 0..N {
+            let x1 = e20.ind_sample(&mut r);
+            let cmp = others.iter().all(|x|
+                x1 > x.ind_sample(&mut r)
+            );
+
+            if cmp {
+                samples.push(1usize);
+            } else {
+                samples.push(0);
+            }
+        }
+
+        let expected = samples.iter().sum::<usize>() as f64 / N as f64;
+        let variance = samples.iter()
+            .map(|&x| (x as f64 - expected).powi(2))
+            .sum::<f64>() / (N as f64 - 1.0);
+
+        println!("");
+        println!("# Exercise 2 #");
+        println!("MC: {}, Variance: {}", expected, variance);
+        variance
+    }
+
+    pub fn condition() -> f64 {
+        let mut r = rand::StdRng::new().unwrap();
+        let e20 = Exponential::new(20.0).unwrap();
+
+        let mut samples = Vec::<f64>::with_capacity(N);
+        for _ in 0..N {
+            let x = e20.ind_sample(&mut r);
+            let sample = (2..11)
+                .map(|y| 1.0 - (-y as f64 * x).exp())
+                .product::<f64>();
+            samples.push(sample);
+        }
+
+        let expected = samples.iter().sum::<f64>() / N as f64;
+        let variance = samples.iter()
+            .map(|&x| (x as f64 - expected).powi(2))
+            .sum::<f64>() / (N as f64 - 1.0);
+
+        println!("Conditioned: {}, Variance: {}", expected, variance);
+        variance
+    }
+}
 
 fn main() {
+    // exercise1::test();
+    // exercise1::test2();
     exercise1::run();
+    // let mc = exercise2::mc();
+    // let cd = exercise2::condition();
+    // println!("Efficiency: {}", mc/cd);
 }

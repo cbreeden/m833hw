@@ -7,3 +7,4 @@ authors = ["cbreeden <github@u.breeden.cc>"]
 rand="*"
 lazy_static="*"
 itertools="*"
+statrs = "0.5.1"
